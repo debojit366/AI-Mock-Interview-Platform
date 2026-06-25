@@ -1,4 +1,3 @@
-// express-backend/server.js
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
@@ -10,12 +9,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MongoDB connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Stack Connected!"))
   .catch(err => console.error(err));
 
-// Schema
 const InterviewSchema = new mongoose.Schema({
   role: String,
   experience: String,
@@ -26,21 +23,18 @@ const InterviewSchema = new mongoose.Schema({
 });
 const Interview = mongoose.model('Interview', InterviewSchema);
 
-// API Endpoint: Setup Interview
 app.post('/api/interview/setup', async (req, res) => {
   const { role, experience, companyType } = req.body;
   try {
-    // 1. Python Microservice ko call karo pehla sawal nikalne ke liye
     const aiResponse = await axios.post(`${process.env.PYTHON_SERVICE_URL}/ai/generate-question`, {
       role,
       experience,
       company: companyType,
-      history: "" // Pehla sawal hai toh history empty hogi
+      history: ""
     });
 
     const firstQuestion = aiResponse.data.question;
 
-    // 2. MongoDB me temporary session state create karo
     const newInterview = new Interview({
       role, experience, companyType,
       currentQuestion: firstQuestion

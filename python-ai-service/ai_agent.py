@@ -1,19 +1,15 @@
-# python-ai-service/ai_agent.py
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
-import os                  # 1. System environment se baat karne ke liye
-from dotenv import load_dotenv  # 2. .env file load karne ke liye
+import os                  
+from dotenv import load_dotenv 
 
-# 3. Ye function tumhari .env file ko read karke memory me load kar dega
 load_dotenv()
 
 app = FastAPI()
 
-# 4. os.getenv se key ko variable me nikal lo
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# 5. LangChain me key pipe kar do
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash", 
     google_api_key=GEMINI_API_KEY,
@@ -40,7 +36,6 @@ async def generate_question(data: InterviewRoundRequest):
             "Do not output greetings. Speak only the question."
         )
         
-        # Yahan call track hogi
         print("Calling Gemini LLM via LangChain...")
         response = await llm.ainvoke(prompt)
         print("Gemini Response Success!")
@@ -48,8 +43,6 @@ async def generate_question(data: InterviewRoundRequest):
         return {"question": response.content}
         
     except Exception as e:
-        # !!! SARA JADU YAHAN HAI !!!
-        # Ye line terminal par asli error print karegi
         print("\n❌ !!! GEMINI CRASH DETECTED !!! ❌")
         print("Error Details:", str(e))
         print("---------------------------------\n")
