@@ -40,3 +40,46 @@ export const startInterviewSession = async (req, res) => {
     });
   }
 };
+
+
+export const handleUserAnswer = async (req, res) => {
+  const { interviewId, userAnswer } = req.body;
+
+  try {
+    
+    const session = await Interview.findById(interviewId);
+    if (!session) {
+      return res.status(404).json({ success: false, error: "Session not found!" });
+    }
+
+    const currentRoundIndex = session.conversation.length - 1;
+    session.conversation[currentRoundIndex].userAnswer = userAnswer;
+
+    let fullHistoryText = "";
+    session.conversation.forEach((round) => {
+      fullHistoryText += `Interviewer: ${round.question}\nCandidate: ${round.userAnswer}\n\n`;
+    });
+
+    const aiResponse = await axios.post(`${process.env.PYTHON_SERVICE_URL}/ai/generate-question`, {
+      role: session.role,
+      experience: session.experience,
+      company: session.companyType,
+      history: fullHistoryText 
+    });
+
+    const nextQuestion = aiResponse.data.question;
+
+    session.conversation.push({ question: nextQuestion });
+    session.currentQuestion = nextQuestion;
+
+    await session.save();
+
+    res.status(200).json({
+      success: true,
+      nextQuestion: nextQuestion
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: "Pipeline breakdown on answer process: " + error.message });
+  }
+};
