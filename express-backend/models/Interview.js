@@ -24,6 +24,7 @@ const InterviewSchema = new mongoose.Schema({
     required: true,
     trim: true 
   },
+  resumeText: { type: String, default: "" },
   // Complete list of questions asked and answers given in this session
   conversation: [QAHistorySchema], 
   

@@ -2,42 +2,49 @@
 import Interview from '../models/Interview.js';
 import axios from 'axios';
 
+
+
 export const startInterviewSession = async (req, res) => {
   const { role, experience, companyType } = req.body;
 
   try {
-    // 1. Python Server connectivity pipeline check
-    const aiResponse = await axios.post(`${process.env.PYTHON_SERVICE_URL}/ai/generate-question`, {
-      role,
-      experience,
-      company: companyType,
-      history: "" // New entry, so empty string
-    });
+    const pythonForm = new FormData();
+    pythonForm.append('role', role);
+    pythonForm.append('experience', experience);
+    pythonForm.append('company', companyType);
+    pythonForm.append('history', "");
 
-    const firstQuestion = aiResponse.data.question;
+    if (req.file) {
+      const fileBlob = new Blob([req.file.buffer], { type: req.file.mimetype });
+      pythonForm.append('resume', fileBlob, req.file.originalname);
+    }
 
-    // 2. Production schema document creation
+    console.log("🚀 Forwarding payload to Python Service...");
+
+    const aiResponse = await axios.post(`${process.env.PYTHON_SERVICE_URL}/ai/generate-question`, pythonForm);
+
+    const initialQuestion = aiResponse.data.question;
+    const extractedText = aiResponse.data.extractedText || "";
+
     const newInterview = new Interview({
       role,
       experience,
       companyType,
-      currentQuestion: firstQuestion,
-      conversation: [{ question: firstQuestion }] // Direct tracking initiation
+      resumeText: extractedText,
+      conversation: [{ question: initialQuestion }]
     });
-
+    
     await newInterview.save();
 
-    res.status(201).json({ 
+    res.status(200).json({
       success: true,
-      interviewId: newInterview._id, 
-      question: firstQuestion 
+      interviewId: newInterview._id,
+      question: initialQuestion
     });
 
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: "Microservice Network Breakdown: " + error.message 
-    });
+    console.error("Express Forwarding Error:", error.message);
+    res.status(500).json({ success: false, error: "Pipeline failed: " + error.message });
   }
 };
 

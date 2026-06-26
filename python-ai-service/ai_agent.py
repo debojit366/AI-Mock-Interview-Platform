@@ -1,4 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from pypdf import PdfReader
+import io
+from typing import Optional
+
 from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os                  
@@ -24,30 +28,69 @@ class InterviewRoundRequest(BaseModel):
     history: str
 
 @app.post("/ai/generate-question")
-async def generate_question(data: InterviewRoundRequest):
+async def generate_question(
+    role: str = Form("MERN Developer"),        
+    experience: str = Form("Fresher"),
+    company: str = Form("Google"),
+    history: Optional[str] = Form(""),        
+    resume: Optional[UploadFile] = File(None)  
+):
     try:
-        print("--- NEW REQUEST RECEIVED ---")
-        print(f"Role: {data.role}, Company: {data.company}")
+        extracted_text = ""
         
-        prompt = (
-            f"You are a professional technical interviewer for {data.company}. "
-            f"Target Role: {data.role} ({data.experience}).\n"
-            f"Conversation History:\n{data.history}\n\n"
-            "Task: Generate exactly ONE short and direct technical interview question. "
-            "Do not output greetings. Speak only the question."
-        )
+        # 1. Parsing logic
+        if resume:
+            print(f"📄 Python Parsing PDF: {resume.filename}")
+            pdf_bytes = await resume.read()
+            pdf_file = io.BytesIO(pdf_bytes)
+            reader = PdfReader(pdf_file)
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    extracted_text += text + "\n"
+
+        # 2. Instruction Logic
+        if extracted_text.strip():
+            resume_instruction = f"""
+            CRITICAL REFERENCE (RESUME MODE ON):
+            The candidate has uploaded a resume. Content:
+            \"\"\"{extracted_text}\"\"\"
+            INSTRUCTION: Ask questions regarding their specific projects, frameworks, and architecture.
+            """
+        else:
+            resume_instruction = """
+            REFERENCE (GENERAL MODE):
+            No resume provided. Ask standard high-quality technical interview questions matching the role.
+            """
+
+        # Safe String cleanup for history
+        safe_history = history if history else ""
+
+        # 3. Compile Master Prompt
+        prompt = f"""
+        You are an expert technical interviewer for the position of {role} at {company} for a level of {experience}.
         
-        print("Calling Gemini LLM via LangChain...")
-        response = await llm.ainvoke(prompt)
-        print("Gemini Response Success!")
+        {resume_instruction}
+
+        CORE LAWS:
+        1. Ask exactly ONE clear technical question.
+        2. Do not include any greeting or markdown formatting. Just return raw question text.
+        3. Maintain history continuity below. Do not repeat topics.
+
+        Current Interview History:
+        {safe_history}
+        """
         
-        return {"question": response.content}
+        response = llm.invoke(prompt)
+        return {"question": response.content.strip(), "extractedText": extracted_text}
         
     except Exception as e:
-        print("\n❌ !!! GEMINI CRASH DETECTED !!! ❌")
-        print("Error Details:", str(e))
-        print("---------------------------------\n")
+        print(f"❌ Python Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
 
 
 class ReportRequest(BaseModel):
