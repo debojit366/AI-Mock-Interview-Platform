@@ -15,12 +15,11 @@ function InterviewRoom() {
 
   const submitAnswer = async () => {
     if (!userAnswer.trim()) {
-      return alert("Bhai, pehle apna answer textbox mein type toh karo!");
+      return alert("write your answer!");
     }
     setLoading(true);
 
     try {
-      // Agar 5 sawal poore ho chuke hain, toh agla answer submit hote hi report page par jao
       if (questionCount >= 5) {
         navigate(`/report/${id}`);
         return;
@@ -32,9 +31,9 @@ function InterviewRoom() {
       });
 
       if (res.data.success) {
-        setCurrentQuestion(res.data.nextQuestion); // Screen par naya sawal aa jayega
-        setUserAnswer(''); // Textarea clear ho jayega agle sawal ke liye
-        setQuestionCount(prev => prev + 1); // Question counter badhega
+        setCurrentQuestion(res.data.nextQuestion); 
+        setUserAnswer(''); 
+        setQuestionCount(prev => prev + 1); 
       }
     } catch (err) {
       alert("Error submitting answer: " + err.message);

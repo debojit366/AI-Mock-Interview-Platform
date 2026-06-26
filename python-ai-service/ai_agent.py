@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os                  
 from dotenv import load_dotenv 
-
+from typing import List
+import json
 load_dotenv()
 
 app = FastAPI()
@@ -47,6 +48,42 @@ async def generate_question(data: InterviewRoundRequest):
         print("Error Details:", str(e))
         print("---------------------------------\n")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ReportRequest(BaseModel):
+    history: str
+
+@app.post("/ai/generate-report")
+async def generate_report(data: ReportRequest):
+    try:
+        prompt = f"""
+        You are an expert technical interviewer. Analyze the following conversation history between the Interviewer and the Candidate.
+        Provide a detailed performance evaluation report in strict JSON format. 
+         Do not include any markdown formatting like ```json or ```, just return the raw JSON string.
+
+        The JSON object must look exactly like this:
+        {{
+            "overallScore": 7.5,
+            "summaryFeedback": "Detailed string feedback here...",
+            "strengths": ["Strength 1", "Strength 2"],
+            "weaknesses": ["Weakness 1", "Weakness 2"]
+        }}
+
+        Conversation History:
+        {data.history}
+        """
+        
+        response = llm.invoke(prompt)
+        
+        # Parse the string response into proper JSON dictionary
+        report_json = json.loads(response.content.strip())
+        return report_json
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
 
 if __name__ == "__main__":
     import uvicorn

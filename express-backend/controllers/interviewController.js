@@ -83,3 +83,47 @@ export const handleUserAnswer = async (req, res) => {
     res.status(500).json({ success: false, error: "Pipeline breakdown on answer process: " + error.message });
   }
 };
+
+
+
+
+export const getInterviewReport = async (req, res) => {
+  const { interviewId } = req.params;
+
+  try {
+    const session = await Interview.findById(interviewId);
+    if (!session) {
+      return res.status(404).json({ success: false, error: "Session not found!" });
+    }
+
+    if (session.status === 'completed' && session.finalEvaluation.summaryFeedback) {
+      return res.status(200).json({ success: true, report: session.finalEvaluation });
+    }
+
+    let fullHistoryText = "";
+    session.conversation.forEach((round) => {
+      fullHistoryText += `Interviewer: ${round.question}\nCandidate: ${round.userAnswer}\n\n`;
+    });
+
+    const aiResponse = await axios.post(`${process.env.PYTHON_SERVICE_URL}/ai/generate-report`, {
+      history: fullHistoryText
+    });
+
+    session.finalEvaluation = {
+      overallScore: aiResponse.data.overallScore,
+      summaryFeedback: aiResponse.data.summaryFeedback,
+      strengths: aiResponse.data.strengths,
+      weaknesses: aiResponse.data.weaknesses
+    };
+    session.status = 'completed';
+    await session.save();
+
+    res.status(200).json({
+      success: true,
+      report: session.finalEvaluation
+    });
+
+  } catch (error) {
+    res.status(500).json({ success: false, error: "AI Evaluation Failed: " + error.message });
+  }
+};
